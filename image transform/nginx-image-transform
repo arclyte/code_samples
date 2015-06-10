@@ -1,0 +1,192 @@
+server {
+	client_max_body_size 10m;
+
+	listen 8080;
+
+	server_name _;
+	log_subrequest on;
+	rewrite_log on;
+
+	root /mnt/media;
+
+	merge_slashes off;
+
+	resolver 8.8.8.8; #Google DNS
+	
+	set $quality 95;
+
+	location /upload {
+		# Pass altered request body to this location
+		upload_pass @identify;
+
+		# Store files in this directory
+		upload_store /mnt/media/upload;
+
+		# Allow uploaded files to be read only by user
+		upload_store_access user:r;
+
+		# Set specified fields in request body
+		upload_set_form_field $upload_field_name.name "$upload_file_name";
+		upload_set_form_field $upload_field_name.content_type "$upload_content_type";
+		upload_set_form_field $upload_field_name.path "$upload_tmp_path";
+
+		# Inform backend about hash and size of a file
+		upload_aggregate_form_field $upload_field_name.md5 "$upload_file_md5";
+		upload_aggregate_form_field $upload_field_name.size "$upload_file_size";
+
+		upload_pass_form_field "submit";
+
+		upload_cleanup 400 404 499 500-505;
+	}
+
+	location @identify {
+		content_by_lua_file "parse_post.lua";
+	}
+
+	location = /favicon.ico {
+		log_not_found off;
+	}
+
+	location @set_animated_gif {
+   		# debug - testing against known animated gif
+   		#set $giffile '/mnt/media/test.gif';
+
+		set_by_lua $is_animated_gif "
+			local handle = io.popen('/usr/bin/identify -format %n ' .. ngx.var.giffile);
+			local frames = handle:read('*a')
+			handle:close()
+
+			if tonumber(frames) > 2 then
+			  return 1
+			else
+			  return 0
+			end
+		";
+    }
+
+    # location ~ (\.gif) {
+    # 	set $is_animated_gif 0;
+    # 	echo_exec @set_animated_gif;
+    # }
+
+    location ~ ^/images/(\d+)x(\d+)/(.*) {
+		set $height $1;
+		set $width $2;
+		set $image_path $3;
+
+		set $image_uri 'http://aws-cache.vevocdn.com/assets/$image_path';
+
+		proxy_store $document_root$request_uri;
+		proxy_store_access user:rw group:rw all:r;
+		proxy_pass_request_body off;
+		proxy_pass_request_headers off;
+		proxy_temp_path /tmp/images;
+
+
+		echo_exec @process;
+		# proxy_pass http://127.0.0.1:8080/internal/resize?uri=$image_uri&height=$height&width=$width;
+
+		#try_files $image_path @image_server;
+    }
+
+    location /internal/image_server {
+    	# content_by_lua_file "image_server.lua";
+    	proxy_pass $arg_uri;
+
+    	allow 127.0.0.0/8;
+		deny all;
+    }
+
+    location @image_server {
+    	content_by_lua_file "lua/image_server.lua";
+    }
+   	
+	location ~ ^/(resize|crop)/(\d+)x(\d+)/(.*) {
+		set $command $1;
+		set $arg1 $2;
+		set $arg2 $3;
+		set $image_uri $4;
+
+		# set $image_uri 'http://aws-cache.vevocdn.com/assets/$image_path';
+
+		# if ($image_uri ~ /(\.gif)/) {
+		# 	echo_exec @set_animated_gif;
+		# }
+
+		echo_exec  @process;
+	}
+
+	location ~ ^/rotate/(90|180|270)/(.*) {
+		set $command rotate;
+		set $arg1 $1;
+		set $arg2 '';
+		set $image_uri $2;
+
+		echo_exec  @process;
+	}
+
+	location @process {
+		proxy_store 		$document_root$request_uri;
+		proxy_store_access	user:rw  group:rw  all:r;
+		proxy_pass_request_body	off;
+		proxy_pass_request_headers	off;
+		proxy_temp_path 	/tmp/images;
+
+		# echo_exec @set_animated_gif;
+
+		# if ($is_animated_gif = 1) {
+		# 	rewrite ^(.*)$ /internal/process_gif/$1;
+		# 	break;
+		# }
+
+		proxy_pass http://127.0.0.1:8080/internal/$command?uri=$image_uri&arg1=$arg1&arg2=$arg2;
+	}
+
+	location /internal/process_gif {
+		content_by_lua '
+			--debug
+			ngx.say("Is Animated GIF: ", ngx.var.is_animated_gif)
+		';
+	}
+
+	location /internal/transform {
+		proxy_pass $arg_uri;
+
+		image_filter_buffer 10M;
+		image_filter_jpeg_quality	$quality;
+		#image_filter
+
+		allow 127.0.0.0/8;
+		deny all;
+	}
+
+	location /internal/resize {
+		proxy_pass 	$arg_uri;
+		
+		image_filter_buffer	10M;
+		image_filter_jpeg_quality	$quality;
+		image_filter 		resize $arg_arg1 $arg_arg2;
+		allow 127.0.0.0/8;
+		deny all;
+	}
+
+	location /internal/crop {
+		proxy_pass 	$arg_uri;
+		
+		image_filter_buffer	10M;
+		image_filter_jpeg_quality	$quality;
+		image_filter		crop $arg_arg1 $arg_arg2;
+		allow 127.0.0.0/8;
+		deny all;
+	}
+
+	location /internal/rotate {
+		proxy_pass	$arg_uri;
+		
+		image_filter_buffer	10M;
+		image_filter_jpeg_quality	$quality;
+		image_filter	rotate $arg_arg1;
+		allow 127.0.0.0/8;
+		deny all;
+	}
+}
