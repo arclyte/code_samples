@@ -52,24 +52,10 @@ Public Github Files
 ===================
 
 #### Github Account
-My personal Github account is available [here](https://github.com/arclyte), and my Vevo-specific account is available [here](https://github.com/JamesAlday), although not much is public under that account.
+My personal Github account is available [here](https://github.com/arclyte), and my work-specific account is available [here](https://github.com/JamesAlday), although not much is public under that account.
 
 #### codeigniter-forensics -
 
 The CodeIgniter framework has a nice code profiler feature that outputs basic debug information that can be helpful in development, but it's layout leaves something to be desired.  I found a very useful 'upgrade' to the basic CI profiler in Lonnie Ezzell's 'CodeIgniter-Forensics' library.  It still had a few rough edges, so I made some updates to the code which can be seen [in the repository](https://github.com/lonnieezell/codeigniter-forensics/commits/master) under my personal account, `arclyte`.
 
 Those changes have since been incorporated into the [Bonfire](http://cibonfire.com/) [project](https://github.com/ci-bonfire/Bonfire).
-
-
-Live Sites
-==========
-
-Following is a list of sites that I have either created or that run on my software:
-
-- [Vevo Certified](http://vevo.com/certified) - VEVO CMS
-- [Vevo LIFT](http://vevo.com/lift) - VEVO CMS
-- [Vevo News](http://vevo.com/news) - VEVO CMS
-- [Vevo Original Content](http://www.vevo.com/shows) - VEVO CMS
-- [Agriculture.com Mobile](http://m.agriculture.com/) - mobile website
-- [NY Chess Castle](http://www.nychesscastle.com/) - uses jekyll/github pages, a freelance project for my son's chess coach
-- [James Alday](http://jamesalday.com/) - uses jekyll/github pages, my personal site
